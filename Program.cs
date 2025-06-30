@@ -1,12 +1,12 @@
 using geospace_back.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -15,7 +15,6 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
 
-// Read JWT settings from appsettings.json or appsettings.Development.json
 var jwtSettings = builder.Configuration.GetSection("JWT");
 var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]);
 var issuer = jwtSettings["Issuer"];
@@ -23,7 +22,6 @@ var audience = jwtSettings["Audience"];
 
 if (!builder.Environment.IsDevelopment())
 {
-    // JWT Authentication
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -44,55 +42,42 @@ if (!builder.Environment.IsDevelopment())
         };
     });
 
-    // Add global authorization filter
     builder.Services.AddMvc(options =>
     {
-        options.Filters.Add(new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter());
-    });
-
-    // Add JWT Authentication to Swagger
-    builder.Services.AddSwaggerGen(c =>
-    {
-        c.SwaggerDoc("v1", new OpenApiInfo { Title = "geospace_back", Version = "v1" });
-
-        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
-            Name = "Authorization",
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Scheme = "Bearer"
-        });
-
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                new string[] {}
-            }
-        });
+        options.Filters.Add(new AuthorizeFilter());
     });
 }
-else
+
+builder.Services.AddSwaggerGen(c =>
 {
-    // Add Swagger without JWT Authentication for Development
-    builder.Services.AddSwaggerGen(c =>
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "geospace_back", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        c.SwaggerDoc("v1", new OpenApiInfo { Title = "geospace_back", Version = "v1" });
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
-}
 
-// Add SQLDbHelper as a singleton service
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
 builder.Services.AddSingleton<SQLDbHelper>();
-
-// Configure CORS to allow all origins, methods, and headers
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllOrigins",
@@ -106,11 +91,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Initialize the DbHelperExtensions with the SQLDbHelper instance
 var dbHelper = app.Services.GetRequiredService<SQLDbHelper>();
 DbHelperExtensions.Initialize(dbHelper);
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -122,21 +105,19 @@ else
 }
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "geospace_back v1");
+});
 
 app.UseHttpsRedirection();
-
-// Use the configured CORS policy
 app.UseCors("AllowAllOrigins");
 
 if (!app.Environment.IsDevelopment())
 {
-    //app.UseMiddleware<RequestDecryptionMiddleware>();
-    //app.UseMiddleware<ResponseEncryptionMiddleware>();
     app.UseAuthentication();
     app.UseAuthorization();
 }
-
 
 app.MapControllers();
 

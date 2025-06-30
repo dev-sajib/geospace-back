@@ -151,6 +151,7 @@ namespace geospace_back.Controllers
             }
         }
 
+        [AllowAnonymous]
         [HttpGet("RoleList")]
         public IActionResult RoleList()
         {
