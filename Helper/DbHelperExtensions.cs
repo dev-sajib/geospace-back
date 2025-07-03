@@ -130,5 +130,38 @@ namespace geospace_back.Helper
                 }
             }
         }
+
+        public static string ExecuteProcedureAndReturnJson(string procedureName, Dictionary<string, SqlParameter> parameters)
+        {
+            using (var connection = new SqlConnection(_dbHelper.Connection.ConnectionString))
+            {
+                connection.Open();
+                using (var command = new SqlCommand(procedureName, connection))
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+                    if (parameters != null)
+                    {
+                        foreach (var param in parameters)
+                        {
+                            command.Parameters.Add(param.Value);
+                        }
+                    }
+
+                    var jsonResult = new System.Text.StringBuilder();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (!reader.HasRows)
+                        {
+                            return "[]";
+                        }
+                        while (reader.Read())
+                        {
+                            jsonResult.Append(reader.GetValue(0).ToString());
+                        }
+                    }
+                    return jsonResult.ToString();
+                }
+            }
+        }
     }
 }
